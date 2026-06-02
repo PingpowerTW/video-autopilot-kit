@@ -3,6 +3,24 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.1] — 2026-06-02
+
+Onboarding + positioning fixes from early adopter feedback.
+
+### Changed
+- **CapCut is now correctly framed as the primary editing path; ffmpeg is secondary.**
+  Requirements previously listed ffmpeg as required and CapCut as optional — inverted.
+  `silent_vlog_maker` (ffmpeg) is now clearly labelled "silent vlogs + post-export only".
+- **Computer Use is now documented as a hard requirement.** CapCut has no public API;
+  `capcut_helpers` automation works by an AI assistant driving the CapCut GUI via Computer
+  Use. README + SETUP now state this up front (it previously wasn't mentioned at all).
+- **`SETUP.md` onboarding sped up.** Added a "5-minute minimum start" (3 ★required sections
+  vs 3 ⭕optional), and made "let the AI interview you" the recommended low-effort path —
+  so adopters can start without filling the entire questionnaire first.
+
+### Fixed
+- Removed a broken `docs/` reference in README (the folder doesn't exist).
+
 ## [0.1.0] — 2026-06-01
 
 Initial public release — extracted + sanitized from a real, battle-tested personal

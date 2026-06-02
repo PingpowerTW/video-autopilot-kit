@@ -8,35 +8,50 @@
 
 *(中文版見 [SETUP.md](SETUP.md))*
 
-## 🚀 Three steps
+## ⚡ Fastest start (you don't have to fill it all in!)
 
+> **Think the questionnaire is long? You don't need to finish it before starting.** Of the 6 sections below, only **3 are ★required** — fill the rest **as you go**.
+
+**Recommended — let the AI interview you (least effort):**
+Hand the whole repo to Claude / ChatGPT and paste:
+> "Ask me only the **★required 3 sections** from `SETUP.md` first (Brand, Niche, Production) and generate my `profiles/`. Ask the optional sections later."
+
+The AI asks one question at a time and fills the files for you — **you just answer out loud**.
+
+**5-minute minimum (answer just these 3 to start):**
+1. Channel name? **Do you show your face?** (decides whether intros/outros schedule an on-camera cue)
+2. What do you make, and which platform? (tutorial/vlog…, YT long-form/Shorts/Reels)
+3. **CapCut** (primary) or pure ffmpeg? Where are your asset / export paths?
+
+→ That's enough to start editing. Voice / Algorithm / Community (4️⃣5️⃣6️⃣) can wait until you want to optimize.
+
+**Manual route (3 steps):**
 1. Copy `templates/*.template.md` → `profiles/*.md` (drop the `.template`)
-2. Answer each section below — or **hand the repo to Claude / ChatGPT** and say:
-   > "Ask me the questions in `SETUP.md` section by section and generate my `profiles/` from my answers."
+2. Fill the **★required** sections (1️⃣2️⃣4️⃣) first; leave the rest blank
 3. `cp config.example.py config.py` → fill in your own paths
-
-When done you have **your own** automation system; run the `src/` tools for editing / publishing.
 
 ---
 
-## 1️⃣ Brand / Channel → generates `profiles/brand.md`
+## 1️⃣ Brand / Channel → generates `profiles/brand.md`　★required
 - Channel name + handle? Website / main link?
 - **How do you sign off?** (voice-over / title card / on-camera?) — this becomes your outro signature
 - ⚠️ **Do you film talking-head / show your face?** (Important — if not, intros/outros must use b-roll + cards, never "selfie cue")
 - Brand colors / preferred fonts? Subscribe-CTA placement?
 
-## 2️⃣ Niche / Content type → routes the pipeline
+## 2️⃣ Niche / Content type → routes the pipeline　★required
 - What do you make? (tutorial / vlog / unboxing / review / gaming …)
 - Main platform? (YT long-form / Shorts / Reels / TikTok)
 - Language?
 
-## 3️⃣ Your Voice → generates `profiles/voice.md`
+## 3️⃣ Your Voice → generates `profiles/voice.md`　⭕optional (add later when tuning scripts)
 - **Paste 5–10 scripts/posts you wrote yourself** — the system learns *your* voice, not someone else's
 - Your typical opener? Catchphrases? Sign-off?
 - **Hard no's?** (anti-patterns — e.g. no profanity, no fake hype, no certain memes)
 
-## 4️⃣ Production → generates `config.py`
-- CapCut Desktop (Pro?) or pure ffmpeg?
+## 4️⃣ Production → generates `config.py`　★required
+- **The primary tool is CapCut Desktop** (Pro is better) — normal edits go through CapCut. Installed?
+- ⚠️ **Does your AI assistant have Computer Use enabled?** CapCut has no public API — automation works by the **AI operating the CapCut window via Computer Use** (click / apply template / export). **Without Computer Use, CapCut automation won't run.**
+- (The pure-ffmpeg `silent_vlog_maker` path is **only for silent, no-voiceover vlogs** — not the default)
 - Where are your **fonts** / **BGM** / **b-roll** stored? Project / export paths?
 - (Filled into `config.py` — the example contains **no account names**)
 

@@ -16,11 +16,10 @@
 
 | 資料夾 | 是什麼 |
 |---|---|
-| `src/capcut_helpers/` | CapCut Desktop JSON 自動化（草稿 I/O / 4-level 靜音 / 花字 / post-export ffmpeg / AI 字幕校正 / b-roll 占比+對位 audit）|
-| `src/silent_vlog_maker/` | ffmpeg-only 影片 pipeline（內容路由 / 素材正規化 / 字幕燒錄）|
+| ⭐ `src/capcut_helpers/` | **主力剪輯路徑** —— CapCut Desktop 自動化（草稿 I/O / 4-level 靜音 / 花字 / post-export ffmpeg / AI 字幕校正 / b-roll 占比+對位 audit）。**靠 AI 助手 + Computer Use 操作 CapCut 視窗**（見下方需求）|
+| `src/silent_vlog_maker/` | **次要路徑（非主力）** —— 純 ffmpeg pipeline，**只給「無口播的靜音 vlog」+ CapCut 匯出後的後製**用（內容路由 / 素材正規化 / 字幕燒錄）。平常剪輯請用 CapCut |
 | ⭐ `SETUP.md` | **從這開始** —— 回答問題讓系統變成你的 |
 | `templates/` | voice / 品牌 / 演算法 / 社群 的**空白填寫**模板 |
-| `docs/` | 通用技術 SOP（CapCut 自動化 / ffmpeg 流程）|
 | `config.example.py` | 路徑設定範例（複製成 `config.py` 填你的，**範例不含任何帳號名**）|
 
 ## 🚀 快速開始
@@ -28,14 +27,23 @@
 1. 讀 **`SETUP.md`** → 照問題把 `templates/*.template.md` 填成 `profiles/*.md`
    （或把整個 repo 丟給 Claude / ChatGPT，說「照 SETUP.md 問我問題，幫我生成 profiles/」）
 2. `cp config.example.py config.py` → 填你的 CapCut / 素材 / 匯出路徑
-3. 確認環境（見下），開始用 `src/` 的工具
+3. **裝好 CapCut Desktop + 開啟 AI 助手的 Computer Use** —— 主力剪輯是 AI 實際操作 CapCut 視窗，**沒開 Computer Use 跑不了**（見下方需求）
+4. 開始用 `src/` 的工具
 
 ## 需求
 
+> ⚠️ **這套系統的主力是 CapCut，不是 ffmpeg。** CapCut 沒有公開 API，自動化是靠 **AI 助手透過 Computer Use 實際操作 CapCut 的視窗**（點按鈕、套模板、匯出）。ffmpeg 只負責「匯出後的後製」與「純靜音 vlog」。
+
+**主力路徑（CapCut —— 平常都用這條）**
+- **CapCut Desktop**（有 Pro 更好）—— 主要剪輯 / 套字幕 / 套模板都在這
+- **AI 助手 + Computer Use**（Claude Desktop / Claude Code 等）—— ⚠️ **必需**。CapCut 自動化 = AI 透過 Computer Use 操作 GUI；**沒開 Computer Use，`capcut_helpers` 的自動化無法驅動 CapCut**
 - Python 3.9+
-- `ffmpeg` / `ffprobe`（在 PATH 上）
-- *(選用)* CapCut Desktop —— 若要用 `capcut_helpers` 的草稿自動化
-- *(選用)* AI 助手（Claude / ChatGPT）—— 自動把你的答案生成 profiles
+- `ffmpeg` / `ffprobe`（在 PATH 上）—— CapCut 匯出後的後製：BGM loop / 修剪到人聲尾 / player-safe 重編
+
+**次要路徑（純 ffmpeg —— 只做無口播靜音 vlog 才需要）**
+- 只有要做「沒有口播的靜音 vlog」時才用 `silent_vlog_maker`。**這條不是主力**，一般影片請走 CapCut。
+
+*(選用)* AI 助手（Claude / ChatGPT）也能照 `SETUP.md` 自動把你的答案生成 profiles。
 
 ## 設計理念
 
