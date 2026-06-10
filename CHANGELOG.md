@@ -3,6 +3,42 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0] — 2026-06-10
+
+Bug-fix wave from a full multi-agent pipeline audit (every fix verified with functional tests).
+
+### Fixed
+- `capcut_helpers/subtitle_corrections.py` — ASCII brand corrections now word-boundary
+  matched ("clearly" no longer becomes "Claudely")
+- `capcut_helpers/invariants.py` — internal `_prev_text_len` snapshot no longer leaks
+  into draft JSON on the clean path
+- `capcut_helpers/caption_broll_matcher.py` — auto-sequencer: inter-cluster gaps now
+  filled (true no-gap coverage); consolidation no longer extends trims beyond the
+  b-roll's real source duration; mismatch audit now picks the subtitle track by CJK
+  character count (was: first track wins)
+- `capcut_helpers/text_style.py` — CapCut SystemFont dir resolved at runtime across
+  versions (was: hardcoded version dir that dangles after CapCut upgrades)
+- `silent_vlog_maker/text_overlay.py` — drawtext fade alpha now uses overlay-relative
+  time (overlays with t_start>0 were fully transparent)
+- `silent_vlog_maker/effects.py` — kenburns_zoom_in honors portrait target_scale
+  (was anamorphic-stretched); kenburns_pan_right actually pans right (expression was
+  out of zoompan's valid range)
+- `silent_vlog_maker/screen_rec_cleaner.py` — clean_voice_pauses wires min_silence_sec
+  into silenceremove (was trimming ALL pauses); clean_screen_recording defaults now use
+  the documented v3 crop values (200/80/zoom)
+- `silent_vlog_maker/quality_check.py` — audio-leak check implements the documented
+  LUFS rule via bgm_only flag, and loudnorm parse failures no longer report as leaks
+- `silent_vlog_maker/frame_audit.py` — skips redundant ffprobe when caller already
+  knows clip duration (−1 subprocess per clip)
+- `silent_vlog_maker/asset_scanner.py` — project-root resolution no longer raises
+  IndexError in shallow checkouts (import crashed for adopters)
+
+### Added
+- `silent_vlog_maker/shorts_captions.py` — multi-color/size Shorts captions, 3 levels,
+  2026 research helpers (safe zone / chunking / active-word karaoke highlight)
+- `silent_vlog_maker/shorts_template.py` — no-face viral Shorts template (niche presets,
+  hook card renderer, 3 hook formulas)
+
 ## [0.1.1] — 2026-06-02
 
 Onboarding + positioning fixes from early adopter feedback.

@@ -8,17 +8,21 @@ import subprocess
 from pathlib import Path
 
 
-def verify_output(mp4_path: Path, expected_outro: bool = True) -> dict:
+def verify_output(mp4_path: Path, expected_outro: bool = True,
+                  bgm_only: bool = False) -> dict:
     """Auto-verify a finished mp4. Returns issues dict — empty means clean.
 
     Catches:
-    - M55: B-roll audio leak (Integrated LUFS > -22 OR LRA > 5 = suspicious)
+    - M55: B-roll audio leak — LRA > 5 = suspicious;
+      bgm_only=True 時加驗 Integrated LUFS > -22（純 BGM silent vlog 才適用——
+      含人聲成品約 -11~-12 LUFS，不能用 -22 線，否則永遠誤報）
     - M56: outro card present (snapshot at end - 2 sec, check non-trivial frame size)
     - M46: portrait/landscape sanity
 
     Args:
         mp4_path: final mp4 (from CapCut Export or fallback)
         expected_outro: True if mp4 should have outro card → verify visible
+        bgm_only: True = 無口播 silent vlog（追加 -22 LUFS 上限檢查）
 
     Returns:
         {
@@ -78,11 +82,20 @@ def verify_output(mp4_path: Path, expected_outro: bool = True) -> dict:
                     pass
         result["audio_integrated_lufs"] = integrated
         result["audio_lra_lu"] = lra
-        result["audio_clean"] = lra < 5.0 and lra > 0
-        if not result["audio_clean"]:
-            issues.append(
-                f"M55 LIKELY AUDIO LEAK — LRA {lra:.1f} LU (clean BGM should be <5)."
-            )
+        # parse 失敗(-99 哨兵)單獨回報，不再誤判成 leak；LUFS 上限只在 bgm_only
+        # 模式驗（含人聲成品 -11~-12 LUFS 本來就 > -22）（2026-06-10 audit）
+        parse_ok = lra > -90 and integrated > -90
+        if not parse_ok:
+            result["audio_clean"] = False
+            issues.append("loudnorm parse failed — audio leak check inconclusive (NOT a confirmed leak)")
+        else:
+            result["audio_clean"] = lra <= 5.0 and (not bgm_only or integrated <= -22.0)
+            if not result["audio_clean"]:
+                issues.append(
+                    f"M55 LIKELY AUDIO LEAK — LRA {lra:.1f} LU (clean ≤ 5)"
+                    + (f" / LUFS {integrated:.1f} (bgm_only clean ≤ -22)" if bgm_only else "")
+                    + "."
+                )
 
     # 3. Outro card visibility
     if expected_outro and duration > 5:

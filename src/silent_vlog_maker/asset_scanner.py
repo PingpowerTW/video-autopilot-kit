@@ -17,7 +17,9 @@ from typing import Optional
 
 # 2026-05-29 audit #2: derive from project root (path-relative, 不寫死磁碟代號)
 # silent_vlog_maker/ → video-autopilot → skills → .claude → <project root>
-_PROJECT_ROOT = Path(__file__).resolve().parents[4]
+# repo 層級可能比原始私有環境淺 — clamp 避免 IndexError（直接 import 就炸）
+_parents = Path(__file__).resolve().parents
+_PROJECT_ROOT = _parents[min(4, len(_parents) - 1)]
 ASSETS_DIR = _PROJECT_ROOT / "assets"
 INDEX_FILE = ASSETS_DIR / "index.json"
 

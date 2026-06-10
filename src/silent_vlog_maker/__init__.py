@@ -138,6 +138,17 @@ from .screen_rec_cleaner import (
 from .quality_check import verify_output
 
 
+
+# 🆕 Reels/Shorts multi-color captions + no-face viral template (2026-06)
+from .shorts_captions import (
+    SHORTS_CAPTION_LEVELS, style_caption, render_caption_png,
+    SHORTS_SAFE_ZONE, safe_caption_y, chunk_caption, style_chunks_active,
+)
+from .shorts_template import (
+    NETGAN_NICHE_PRESETS, NETGAN_SHORTS_TEMPLATE, render_hook_card,
+    HOOK_FORMULAS, suggest_hook,
+)
+
 __all__ = [
     # constants
     "SAFE_ZONE", "TONEMAP_FILTER", "YT_SHORTS_ENCODE_ARGS",
@@ -180,4 +191,9 @@ __all__ = [
     "normalize_broll_asset", "batch_normalize_broll_folder",  # 🆕 M85 素材入庫
     # 🆕 v4.5 (M64 — ffmpeg build path deleted, CapCut universal)
     "verify_output",
+    # Reels/Shorts captions + no-face template
+    "SHORTS_CAPTION_LEVELS", "style_caption", "render_caption_png",
+    "SHORTS_SAFE_ZONE", "safe_caption_y", "chunk_caption", "style_chunks_active",
+    "NETGAN_NICHE_PRESETS", "NETGAN_SHORTS_TEMPLATE", "render_hook_card",
+    "HOOK_FORMULAS", "suggest_hook",
 ]

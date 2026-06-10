@@ -327,11 +327,25 @@ def audit_caption_broll_mismatch(
     total = 0
     high = medium = low = 0
 
-    for tr_idx, tr in enumerate(draft.get("tracks", [])):
-        if tr.get("type") != "text":
-            continue
-        # Skip the English translation track (usually track[1] in dual-tier setup)
-        # Heuristic: pick track with more Chinese characters in text
+    # 中英雙軌時 audit 中文軌 — 真的用 CJK 字數挑軌（2026-06-10 audit 修正：
+    # 之前只是 break 在第一條有字的軌，英文軌排前面就 audit 錯軌）
+    def _track_cjk_count(tr):
+        n = 0
+        for seg in tr.get("segments", []):
+            mat = texts_by_id.get(seg.get("material_id", ""), {})
+            try:
+                t = json.loads(mat.get("content", "{}")).get("text", "")
+            except json.JSONDecodeError:
+                continue
+            n += sum(1 for ch in t if "一" <= ch <= "鿿")
+        return n
+
+    text_tracks = [(i, tr) for i, tr in enumerate(draft.get("tracks", []))
+                   if tr.get("type") == "text" and tr.get("segments")]
+    if text_tracks:
+        text_tracks = [max(text_tracks, key=lambda it: _track_cjk_count(it[1]))]
+
+    for tr_idx, tr in text_tracks:
         for seg in tr.get("segments", []):
             mat = texts_by_id.get(seg.get("material_id", ""), {})
             try:
@@ -384,10 +398,6 @@ def audit_caption_broll_mismatch(
                     "score_diff": diff,
                     "severity": severity,
                 })
-
-        # Only audit one text track (to avoid double-counting Chinese + English)
-        if total > 0:
-            break
 
     return {
         "total_captions": total,
@@ -671,6 +681,25 @@ def auto_sequence_brolls(
             merged.append(cl)
     clusters = merged
 
+    # Step 2c: fill INTER-cluster gaps (caption 間的空檔) — 否則 timeline 有洞，
+    # 違反 docstring「cover [0,total] with no gaps」(2026-06-10 audit 實測抓到)
+    # 小 gap (≤3s) 直接延長前一 cluster；大 gap 插 generic filler
+    _GAP_EXTEND_US = 3_000_000
+    gap_filled = []
+    for cl in clusters:
+        if gap_filled:
+            prev_end = gap_filled[-1]["end_us"]
+            gap = cl["start_us"] - prev_end
+            if 0 < gap <= _GAP_EXTEND_US:
+                gap_filled[-1]["end_us"] = cl["start_us"]
+            elif gap > _GAP_EXTEND_US:
+                gap_filled.append({
+                    "topic": "generic", "start_us": prev_end,
+                    "end_us": cl["start_us"], "caption_idxs": [],
+                })
+        gap_filled.append(cl)
+    clusters = gap_filled
+
     # Step 3+4: assign brolls to clusters (greedy with split if cluster > source)
     assignments = []
     used_ids = set()
@@ -737,10 +766,17 @@ def auto_sequence_brolls(
     # (avoids fragmentation when greedy clustering put adjacent same-broll slots)
     if consolidate_consecutive and len(assignments) > 1:
         consolidated = [assignments[0]]
+        _src_by_id = {b.get("id"): b.get("source_duration_us") for b in brolls}
         for a in assignments[1:]:
             prev = consolidated[-1]
+            # merge 後的 trim 不能超出 broll 真實 source 長度 — 否則 CapCut 卡格/黑畫面
+            # (2026-06-10 audit 實測: 5s source 被 merge 成 12s trim)
+            _src_dur = _src_by_id.get(prev.broll_id)
+            _fits = (_src_dur is None or
+                     prev.source_trim_us[0] + prev.duration_us + a.duration_us <= _src_dur)
             if (prev.broll_id == a.broll_id
-                    and prev.start_us + prev.duration_us == a.start_us):
+                    and prev.start_us + prev.duration_us == a.start_us
+                    and _fits):
                 # Merge into prev
                 prev.duration_us += a.duration_us
                 prev.source_trim_us = (prev.source_trim_us[0],

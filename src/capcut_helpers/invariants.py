@@ -114,6 +114,14 @@ def validate_invariants(
                 elif on_violation == "warn":
                     warnings.warn(msg, RuntimeWarning, stacklevel=2)
 
+            # snapshot key 絕不能流進 draft JSON — 乾淨路徑也要清 (2026-06-10 audit:
+            # 之前只有 _fix_styles_range 觸發時才 pop → 無違規的 mutation 把
+            # _prev_text_len 序列化進 CapCut content)
+            if isinstance(mutated, dict):
+                mutated.pop("_prev_text_len", None)
+            if isinstance(data, dict) and data is not mutated:
+                data.pop("_prev_text_len", None)
+
             return result
         return wrapper
     return decorator

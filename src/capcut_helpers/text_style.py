@@ -23,10 +23,11 @@ CAPCUT_FONTS = {
         "font_filename": "font.ttf",
     },
     "capcut_systemfont": {
-        # M68 (2026-05-25) — CapCut bundled SystemFont (Hao 教學 default)
+        # M68 (2026-05-25) — CapCut bundled SystemFont (default)
         # Not in Cache/effect/ — lives in Apps/<version>/Resources/Font/SystemFont/
-        # Use raw absolute path (no effect_id needed)
-        "absolute_path": str(Path.home() / "AppData/Local/CapCut/Apps")  # CapCut version-specific; adjust to your install,
+        # 版本目錄 runtime 解析（2026-06-10 audit: 之前寫死 8.6.0.3667，CapCut
+        # 升級到 8.7.x 後舊目錄會被清掉 → dangling path）
+        "apps_glob": "AppData/Local/CapCut/Apps/*/Resources/Font/SystemFont",
     },
     # Future: add more user-discovered fonts here via the same pattern
 }
@@ -38,7 +39,17 @@ def get_capcut_font_path(font_name: str) -> str:
     if font_name not in CAPCUT_FONTS:
         raise KeyError(f"Unknown CapCut font '{font_name}'. Known: {list(CAPCUT_FONTS.keys())}")
     f = CAPCUT_FONTS[font_name]
-    # M68: support fonts that live outside effect cache (e.g. CapCut SystemFont in Apps/<version>/Resources/)
+    # M68: fonts outside effect cache (CapCut SystemFont in Apps/<version>/Resources/)
+    if "apps_glob" in f:
+        from pathlib import Path
+        candidates = sorted(Path.home().glob(f["apps_glob"]))
+        if not candidates:
+            raise FileNotFoundError(
+                f"CapCut SystemFont dir not found under {Path.home() / f['apps_glob']} — CapCut installed?")
+        sysfont_dir = candidates[-1]  # highest version
+        fonts = sorted(sysfont_dir.glob("*.[ot]tf"))
+        target = fonts[0] if fonts else sysfont_dir
+        return str(target).replace("\\", "/")
     if "absolute_path" in f:
         return f["absolute_path"]
     path = EFFECT_CACHE / f["effect_id"] / f["cache_subdir"] / f["font_filename"]

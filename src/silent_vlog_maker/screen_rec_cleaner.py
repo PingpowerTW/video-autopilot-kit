@@ -38,15 +38,18 @@ DEFAULTS_OBS_CHROME_4K = {
 def clean_screen_recording(
     input_mp4: Path,
     output_mp4: Path,
-    top_crop_px: int = 80,
-    bottom_crop_px: int = 50,
+    top_crop_px: int = DEFAULTS_OBS_CHROME_WIN11["top_crop_px"],        # 200 (M60 v3)
+    bottom_crop_px: int = DEFAULTS_OBS_CHROME_WIN11["bottom_crop_px"],  # 80  (M60 v3)
     trim_start_sec: float = 1.5,
     trim_end_sec: float = 4.0,
     target_width: int = 1920,
     target_height: int = 1080,
-    fill_mode: str = "letterbox",   # "letterbox" / "zoom"
+    fill_mode: str = DEFAULTS_OBS_CHROME_WIN11["fill_mode"],            # "zoom" (M60 v3)
 ) -> Path:
     """M60 + M61 — strip OBS / browser chrome + trim start/end.
+
+    ⚠️ 2026-06-10 audit fix: 預設值之前是 v1 的 80/50/letterbox（檔頭 changelog 自己
+    標記「截不乾淨」的版本）— 現在直接 wire DEFAULTS_OBS_CHROME_WIN11 (v3 200/80/zoom)。
 
     Pipeline:
     1. ffprobe duration
@@ -58,8 +61,8 @@ def clean_screen_recording(
     Args:
         input_mp4: source OBS recording
         output_mp4: cleaned output
-        top_crop_px: pixels to strip from top (default 80 for Chrome on Win11)
-        bottom_crop_px: pixels to strip from bottom (default 50 for Win11 taskbar)
+        top_crop_px: pixels to strip from top (default 200 — Chrome tab+bookmark bar on Win11, M60 v3)
+        bottom_crop_px: pixels to strip from bottom (default 80 — Win11 taskbar, M60 v3)
         trim_start_sec: drop first N sec (OBS UI / scene switch)
         trim_end_sec: drop last N sec ("stop recording" UI)
         target_width / target_height: final canvas (default 1920×1080)
@@ -148,9 +151,12 @@ def clean_voice_pauses(
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-i", str(input_voice),
         "-af", (
+            # stop_duration = min_silence_sec：只修剪「長於 0.8s」的停頓 — 之前漏傳
+            # 導致 ffmpeg 預設 0s = 所有自然小停頓全被壓扁、語速機械化（2026-06-10 audit）
             f"silenceremove="
             f"start_periods=1:start_threshold={silence_threshold_db}dB:start_silence={keep_silence_sec}:"
             f"stop_periods=-1:stop_threshold={silence_threshold_db}dB:stop_silence={keep_silence_sec}:"
+            f"stop_duration={min_silence_sec}:"
             f"detection=peak,"
             f"loudnorm=I=-16:TP=-1.5:LRA=11"
         ),

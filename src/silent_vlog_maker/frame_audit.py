@@ -1,7 +1,7 @@
 """
 silent_vlog_maker.frame_audit — M9/M21/M34 hi-res frame extraction + grid + scene cache.
 
-解決 #003 a travel vlog 8/18 caption 錯位的根本痛點：
+解決 #003 馬來西亞 vlog 8/18 caption 錯位的根本痛點：
 - 每 clip 抽 4 hi-res frames (start/early/mid/late) at 640×360
 - 拼大 grid 一張圖讓 Claude Read 一次看完
 - 描述 cache 寫 JSON，後續 build script 用作 ground truth
@@ -26,6 +26,7 @@ def extract_frames_hires(
     frame_width: int = 640,
     frame_height: int = 360,
     label: bool = True,
+    duration_sec: float = None,  # 已知長度就不再 ffprobe (2026-06-10 perf)
 ) -> list[Path]:
     """Extract N hi-res frames at start/dur*1/3/dur*2/3/dur-0.5 — for caption verify.
 
@@ -35,16 +36,19 @@ def extract_frames_hires(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Get duration first
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=nw=1:nk=1", str(clip_path)],
-        capture_output=True, text=True
-    )
-    try:
-        dur = float(result.stdout.strip())
-    except (ValueError, AttributeError):
-        return []
+    # Get duration (caller 已有 ClipAudit.duration_sec 時直接用 — 省 1 次 ffprobe/clip)
+    if duration_sec and duration_sec > 0:
+        dur = float(duration_sec)
+    else:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", str(clip_path)],
+            capture_output=True, text=True
+        )
+        try:
+            dur = float(result.stdout.strip())
+        except (ValueError, AttributeError):
+            return []
 
     # Compute timestamps: start, early, mid, late
     if n_frames == 4:
@@ -152,7 +156,8 @@ def audit_all_clips_frames(
         clip_path = Path(clip.filepath) if clip.filepath else Path(clip.filename)
         if not clip_path.exists():
             continue
-        frames = extract_frames_hires(clip_path, frames_dir, n_frames=n_frames_per_clip)
+        frames = extract_frames_hires(clip_path, frames_dir, n_frames=n_frames_per_clip,
+                                      duration_sec=getattr(clip, 'duration_sec', None))
         all_frames.append((clip.filename, frames))
 
     # Build grids: clips_per_grid clips per grid, n_frames_per_clip frames per clip

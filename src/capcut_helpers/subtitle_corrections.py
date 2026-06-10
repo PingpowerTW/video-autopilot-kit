@@ -28,11 +28,11 @@ from .invariants import validate_invariants, TEXT_MATERIAL_INVARIANTS, TEXT_MATE
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Correction dict — Hao 通用 (適用任何 Claude / AI / (your community) 影片)
+# Correction dict — 通用 (適用任何 Claude / AI / (your community) 影片)
 # 永遠 grow this dict as new errors found
 # ─────────────────────────────────────────────────────────────────────
 
-# Critical brand / proper noun typos — exact match (word boundary aware via word_correction)
+# Critical brand / proper noun typos — ASCII keys are word-boundary matched (\b) in _mutate_one_text
 BRAND_CORRECTIONS = {
     # Claude — most common mishear
     "cloud": "Claude",
@@ -137,15 +137,24 @@ def apply_subtitle_corrections(
         text = co.get("text", "")
         orig_iter = text
         for wrong, right, kind in corrections_list:
-            if wrong in text:
+            # 純 ASCII 詞 (clear/crowd/cloud/studio…) 必須 word-boundary，
+            # 否則 "clearly"→"Claudely" / "crowded"→"Claudeed" (2026-06-10 audit)
+            if wrong.isascii() and wrong.replace(" ", "").isalnum():
+                new_text, n = re.subn(rf"\b{re.escape(wrong)}\b", right, text)
+                if n == 0:
+                    continue
+                text = new_text
+            elif wrong in text:
                 text = text.replace(wrong, right)
-                fixes_per_kind[kind] += 1
-                changes.append((idx, orig_iter, text, kind, wrong, right))
-                if verbose:
-                    print(f'  [{idx:3}] {kind}: {wrong!r} → {right!r}')
-                    print(f'        BEFORE: {orig_iter[:80]}')
-                    print(f'        AFTER:  {text[:80]}')
-                orig_iter = text
+            else:
+                continue
+            fixes_per_kind[kind] += 1
+            changes.append((idx, orig_iter, text, kind, wrong, right))
+            if verbose:
+                print(f'  [{idx:3}] {kind}: {wrong!r} → {right!r}')
+                print(f'        BEFORE: {orig_iter[:80]}')
+                print(f'        AFTER:  {text[:80]}')
+            orig_iter = text
         co["text"] = text
         return co
 

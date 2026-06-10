@@ -19,10 +19,12 @@ def kenburns_zoom_in(duration_sec: float, fps: int = 30, target_scale: str = "10
         [N:v]format=yuv420p,{kenburns_zoom_in(5.0)},setpts=PTS-STARTPTS[vN]
     """
     frames = int(duration_sec * fps)
-    # zoompan needs integer frames + smooth zoom expression
+    # 前置 scale/crop 跟著 target_scale 走 — 之前寫死 1920:1080，直式 1080:1920
+    # 會被 zoompan 拉成變形（2026-06-10 audit）
+    tw, th = target_scale.split(":")
     return (
-        f"scale=1920:1080:force_original_aspect_ratio=increase,"
-        f"crop=1920:1080,"
+        f"scale={tw}:{th}:force_original_aspect_ratio=increase,"
+        f"crop={tw}:{th},"
         f"zoompan=z='min(zoom+0.0015,{zoom_max})':d={frames}:s={target_scale}:fps={fps}"
     )
 
@@ -30,10 +32,12 @@ def kenburns_zoom_in(duration_sec: float, fps: int = 30, target_scale: str = "10
 def kenburns_pan_right(duration_sec: float, fps: int = 30, target_scale: str = "1920:1080") -> str:
     """Pan-right + slight zoom over duration."""
     frames = int(duration_sec * fps)
+    # x 在 zoompan 合法範圍 [0, iw-iw/zoom] 內由左掃到右 — 舊式子起點超界被 clamp
+    # 且隨時間遞減（實際是向左/不動），從未真正 pan right（2026-06-10 audit）
     return (
         f"scale=2400:1350:force_original_aspect_ratio=increase,"
         f"zoompan=z='min(zoom+0.0008,1.1)':"
-        f"x='iw/zoom-(iw/zoom-iw/zoom*0.9)*on/{frames}':"
+        f"x='(iw-iw/zoom)*on/{frames}':"
         f"y='ih/2-(ih/zoom/2)':"
         f"d={frames}:s={target_scale}:fps={fps}"
     )

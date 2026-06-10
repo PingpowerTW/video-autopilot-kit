@@ -49,11 +49,15 @@ class Overlay:
             params.append(f"boxborderw={preset['box_pad']}")
 
         # Build alpha curve: fade in over fade_in_s, hold, fade out at (t_end - fade_out_s)
-        fade_out_start = self.t_end - self.t_start - self.fade_out
+        # drawtext 的 t 是「絕對」時間軸時間 — fade 計算必須用 (t - t_start) 相對時間，
+        # 否則 t_start>0 的 overlay alpha 恆為負 → 全程隱形（2026-06-10 audit）
+        rel = f"(t-{self.t_start})"
+        dur = self.t_end - self.t_start
+        fade_out_start = dur - self.fade_out
         alpha = (
-            f"if(lt(t,{self.fade_in}),t/{self.fade_in},"
-            f"if(gt(t,{fade_out_start}),"
-            f"({self.t_end - self.t_start}-t)/{self.fade_out},1))"
+            f"if(lt({rel},{self.fade_in}),{rel}/{self.fade_in},"
+            f"if(gt({rel},{fade_out_start}),"
+            f"({dur}-{rel})/{self.fade_out},1))"
         )
         params.append(f"alpha='{alpha}'")
         params.append(f"enable='between(t,{self.t_start},{self.t_end})'")
