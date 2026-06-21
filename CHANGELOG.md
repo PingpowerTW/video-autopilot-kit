@@ -3,6 +3,28 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.2] — 2026-06-22
+
+Patch: two Windows integration bugs in the v0.3.1 code that the string-only self-tests
+(no real ffmpeg/ffprobe) didn't catch. Surfaced the first time the vertical-Shorts
+pipeline was run end-to-end.
+
+### Fixed
+- **`build_one_short` caption burn** — the `ass=` filter value held a Windows drive-letter
+  colon (`D:`), which libavfilter parses as an option separator (`original_size`), so
+  caption burning always failed on a Windows absolute path. Now runs ffmpeg with `cwd` set
+  to the output dir and a **relative** `ass=<basename>` (no colon). (The old first attempt
+  used basenames but forgot to set cwd; the fallback used the full colon path — both broke.)
+- **`_probe_wh` (M92 letterbox detection)** — `ffprobe -of csv=p=0:s=x` emits a trailing
+  separator + CRLF on Windows (`1080x1920x\r`), so `split('x')` returned 3 parts and raised.
+  Now parses with `re.findall(r'\d+', …)` (immune to trailing separators / CRLF).
+- **self-test regression guard** — added the `1080x1920x\r` parse case to `delivery_qa`'s
+  self-test.
+
+> Lesson: a self-test that mocks out the external tool (ffmpeg/ffprobe) only exercises your
+> string assembly, not whether the tool accepts the args. New pipelines need at least one
+> real end-to-end run before shipping.
+
 ## [0.3.1] — 2026-06-20
 
 Hardening + reach. Makes the v0.3.0 QA layer robust on Windows/CJK setups, adds

@@ -125,21 +125,18 @@ def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2):
                     '-crf', '19', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-r', '30', vis])
     if r.returncode:
         raise RuntimeError('build_one_short visual failed: ' + r.stderr[-500:])
-    # 2) captions
+    # 2) captions — 一律在 out 目錄內跑 + 全用 basename：ass filter 的值若含 Windows
+    #    碟符冒號(D:) 會被當成選項分隔(original_size) → 必須用相對路徑。cwd 設在 out 目錄，
+    #    basename 就能解析。（舊版第一次嘗試忘了設 cwd、fallback 又帶冒號 → 兩條都壞，已修。）
     ass = base + '.ass'; build_multicolor_ass(caps, ass)
     cap = base + '_cap.mp4'
-    r = _run(['ffmpeg', '-v', 'error', '-y', '-i', os.path.basename(vis),
-              '-vf', 'ass=' + os.path.basename(ass), '-c:v', 'libx264', '-crf', '19',
-              '-preset', 'medium', '-pix_fmt', 'yuv420p', '-r', '30', os.path.basename(cap)])
-    # cwd=base dir 讓 ass 用相對路徑（避 Windows 冒號跳脫）
+    workdir = os.path.dirname(os.path.abspath(out)) or '.'
+    r = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', os.path.basename(vis),
+                        '-vf', 'ass=' + os.path.basename(ass), '-c:v', 'libx264', '-crf', '19',
+                        '-preset', 'medium', '-pix_fmt', 'yuv420p', '-r', '30', os.path.basename(cap)],
+                       capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=workdir)
     if r.returncode:
-        r = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', vis, '-vf', 'ass=' + ass,
-                            '-c:v', 'libx264', '-crf', '19', '-preset', 'medium',
-                            '-pix_fmt', 'yuv420p', '-r', '30', cap],
-                           capture_output=True, text=True, encoding='utf-8', errors='replace',
-                           cwd=os.path.dirname(out) or '.')
-        if r.returncode:
-            raise RuntimeError('build_one_short caption failed: ' + r.stderr[-500:])
+        raise RuntimeError('build_one_short caption failed: ' + r.stderr[-500:])
     # 3) BGM 當主音（無人聲）loop + fade
     fo = max(0.3, total - fade)
     r = _run(['ffmpeg', '-v', 'error', '-y', '-i', cap, '-stream_loop', '-1', '-i', bgm,

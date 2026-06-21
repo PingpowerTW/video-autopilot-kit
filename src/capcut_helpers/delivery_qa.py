@@ -121,8 +121,10 @@ def detect_flash(video, pic_th=0.90, d=0.05):
 def _probe_wh(video):
     r = _run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
               'stream=width,height', '-of', 'csv=p=0:s=x', video])
-    w, h = r.stdout.strip().split('x')
-    return int(w), int(h)
+    # 用 regex 抓數字（不 split('x')）：ffprobe 在 Windows 會吐尾端多餘分隔符 + CRLF
+    # 例如 "1080x1920x\r" → split 會多一段空字串炸掉。findall 取前兩個數字就穩。
+    nums = [int(x) for x in re.findall(r'\d+', r.stdout)]
+    return nums[0], nums[1]
 
 def detect_dead_borders(video, tol=4, frames=300):
     """M92：cropdetect 抓「非滿版留死黑邊」(letterbox/pillarbox — 非滿版圖沒做模糊填底就會這樣)。
@@ -217,4 +219,6 @@ if __name__ == "__main__":
     assert cp and cp[-1] == ('1920', '1036', '0', '22'), "cropdetect 解析漏判"
     _cw, _ch = 1920, 1036
     assert (1920 - _cw) <= 4 and (1080 - _ch) > 4, "死黑邊 threshold 邏輯錯（高度該判有黑邊）"
+    # _probe_wh 解析：對 ffprobe csv 尾端多餘分隔符 + CRLF 免疫（不 split('x')）— 2026-06-22 踩過
+    assert [int(x) for x in _re.findall(r'\d+', "1080x1920x\r")][:2] == [1080, 1920], "_probe_wh 尾端分隔解析漏判"
     print("[delivery_qa selftest] OK")

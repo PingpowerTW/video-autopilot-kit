@@ -91,7 +91,7 @@ from .post_export import (
     reencode_player_safe,   # M83 — libx264/-bf0/CFR/closed-GOP player-safe ship profile
 )
 
-# 🆕 v0.3.1 (2026-06-20): 交付前 QA + 圖片入片 helpers (canon M91-M95)
+# 🆕 v0.3.2 (2026-06-22): 交付前 QA + 圖片入片 helpers (canon M91-M95)
 from .delivery_qa import (
     final_delivery_qa,      # 🚦 交付前 QA 主入口 (M93 頻閃 + M95 死空檔 + M92 死黑邊 + 接觸表)
     still_blurfill,         # M92 — 非滿版圖→模糊背景填滿+靜止(零抖動)
@@ -180,7 +180,7 @@ __all__ = [
     "validate_invariants", "TEXT_MATERIAL_INVARIANTS", "TEXT_MATERIAL_AUTO_FIX",
     # audit
     "audit_draft", "print_audit_report",
-    # 🆕 v0.3.1 交付前 QA + 圖片入片 (M91-M95)
+    # 🆕 v0.3.2 交付前 QA + 圖片入片 (M91-M95)
     "final_delivery_qa", "still_blurfill", "detect_flash", "detect_dead_borders",
     "detect_long_pauses",
     "trim_dead_air_ranges", "build_keep_ranges", "remap_time",
