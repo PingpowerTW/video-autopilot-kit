@@ -6,6 +6,17 @@
 >
 > ⚠️ **不含任何原作者的私人數據** —— voice / 策略 / 社群數字全部是**空白模板**，你填你的。
 
+## ▶️ 60 秒看它跑（不用 CapCut、不用真素材）
+
+想先看它**真的會動**？`examples/` 裡有自包含、可直接跑的 demo —— 用 ffmpeg 合成測試素材，不需要任何真實影片或 CapCut：
+
+```bash
+python examples/01_vertical_short.py      # 合成素材 → 完整 1080x1920 直式 Short
+python examples/02_caption_broll_match.py # 零設定：b-roll 用內容命名就自動對位字幕
+```
+
+需求：Python 3.9+ 與 `ffmpeg`/`ffprobe`（只有 example 01 需要 ffmpeg）。細節見 [`examples/README.md`](examples/README.md)。
+
 ## 為什麼不一樣
 
 市面上的「creator 系統」要嘛賣你**某個人的設定**（抄了對你沒用、還可能誤導），
@@ -18,7 +29,8 @@
 |---|---|
 | ⭐ `src/capcut_helpers/` | **主力剪輯路徑** —— CapCut Desktop 自動化（草稿 I/O / 4-level 靜音 / 花字 / post-export ffmpeg / AI 字幕校正 / b-roll 占比+對位 audit / **交付前 QA `delivery_qa`：頻閃·死空檔·圖片排版·chrome 自檢 M91-M95**）。**靠 AI 助手 + Computer Use 操作 CapCut 視窗**（見下方需求）|
 | `src/silent_vlog_maker/` | **次要路徑（非主力）** —— 純 ffmpeg pipeline，**只給「無口播的靜音 vlog」+ CapCut 匯出後的後製**用（內容路由 / 素材正規化 / 字幕燒錄）。平常剪輯請用 CapCut |
-| `knowledge/` | **影片製作知識庫** —— M1-M99 避坑大全 + 演算法 + SOP + 剪輯心法 |
+| `knowledge/` | **影片製作知識庫** —— M1-M100 避坑大全 + 演算法 + SOP + 剪輯心法 |
+| ▶️ `examples/` | **自包含可跑 demo** —— ffmpeg 合成素材，60 秒看 pipeline 真的動（不用 CapCut/真素材）|
 | ⭐ `SETUP.md` | **從這開始** —— 回答問題讓系統變成你的 |
 | `templates/` | voice / 品牌 / 演算法 / 社群 的**空白填寫**模板 |
 | `config.example.py` | 路徑設定範例（複製成 `config.py` 填你的，**範例不含任何帳號名**）|

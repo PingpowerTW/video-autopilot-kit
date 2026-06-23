@@ -3,6 +3,32 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] — 2026-06-23
+
+**Getting started: runnable examples.** A new `examples/` folder with self-contained,
+ffmpeg-synthesized demos, so a newcomer can watch the pipeline work end-to-end in ~60
+seconds — no real footage and no CapCut required.
+
+### Added
+- `examples/01_vertical_short.py` — synthesizes two landscape test clips + a music track
+  with ffmpeg, then runs the real pipeline (`normalize_to_portrait` → `build_one_short`
+  with multi-color captions + BGM started at its highlight) to produce a finished
+  1080x1920 MP4. Verified end-to-end.
+- `examples/02_caption_broll_match.py` — pure-Python (no ffmpeg) demo of zero-config
+  `auto_sequence_brolls`: name b-roll by content (`coffee.mp4`, `sunset.mov`) and each
+  caption gets the matching clip, with filler for the gaps.
+- `examples/README.md` + a "See it run in 60 seconds" section in both READMEs.
+
+## [0.4.2] — 2026-06-23
+
+- `_probe_dur()` in `delivery_qa.py` + `screen_rec_cleaner.py` now raise a clear
+  `RuntimeError` on a bad/missing media file instead of an opaque `float("")` crash —
+  closing the last unguarded duration probes.
+- `knowledge/meta-lessons.md`: added **M100** — a single grep gate is necessary but NOT
+  sufficient for public-release sanitization; you need adversarial multi-round,
+  multi-angle scanning looped until a full round returns zero (distilled from the v0.4.1
+  remediation). `M1-M99` → `M1-M100`.
+
 ## [0.4.1] — 2026-06-23
 
 **Privacy hardening + the font fix that should've shipped.** A 7-agent audit of the
