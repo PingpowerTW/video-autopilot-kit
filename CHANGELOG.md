@@ -3,6 +3,51 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0] — 2026-07-09
+
+**Premium motion engine + mechanized caption timing & screen-recording cleanup** (the biggest *visual*-quality jump in the kit so far — v0.6.0 fixed the sound, this one fixes the picture). Motivated by two shipped-video incidents (a recorder panel leaking into a delivered cut; captions drifting 2-3s from narration) plus a 6-lens research pass on what separates "clean" from "premium" motion design.
+
+### Added
+- `src/longform_maker/` — new module family for teaching long-form:
+  - **`fx_lib.py`** — the premium-motion engine: easing library (`ease_out_expo`, `ease_out_quint`,
+    `ease_out_back`, `smootherstep`…), stagger scheduler, per-frame film grain + vignette
+    (`texture_pass`), **sub-pixel float Ken Burns** (`ken_burns_frame`, the anti-`zoompan` —
+    integer-jitter-free push/pull on stills), **double-layer additive bloom** (tight 4px @60% +
+    wide 16px @30%), 45° **light sweep**, and a fully **synthesized SFX kit**
+    (whoosh / pop / tick / riser / hit — no audio assets needed). Real self-test.
+  - **`word_captions.py`** (M105) — caption timing from **whisper word-timestamps**: auto line-break
+    at real pauses (next-token onset), mishear fixes applied *before* line-breaking, dangler-aware
+    wrapping, master-timeline conversion (M103 speed-aware), ASS output — plus optional
+    **per-line single-keyword emphasis** (numbers-first, one hit per line, resets to white).
+  - **`screen_clean.py`** (M104) — screen recordings are default-toxic: enforced **head ≥1s + tail
+    trim** (recorder UI lives at *both* ends), chrome crop, blur-pad, mute, and **`blur_boxes`
+    targeted blurs** for center-of-frame UI text that cropping can't save. Real ffmpeg self-test.
+- `src/capcut_helpers/delivery_qa.py` — four new mechanical gates: **caption-sync spot-check**
+  (whisper re-transcribe n sampled lines, char-overlap ≥0.5), **full-frame contact sheets**
+  (dense ≤1.5s/frame scan — edge strips can't see center-frame floaters), **scene-pacing 3-band
+  audit** (max visual-change gaps 7s/15s/30s by video section), and **dead-air detection**
+  (freezedetect ∩ silencedetect; catches the classic "frozen tail + silence").
+- `knowledge/meta-lessons.md`: **M104** (screen-recording cleanup, mechanized), **M105**
+  (word-level caption timing, mechanized), **M106** (premium-motion wave-1: no static cards >5s,
+  sub-pixel-only camera moves, counter triple — expo + fixed digit slots + landing pop with the
+  **final frame asserted equal to the true value**, double bloom, SFX aligned to cuts ±50ms,
+  split-tone finishing).
+- `knowledge/premium-motion-fx.md` — the full wave-1/2/3 upgrade plan with exact parameters
+  (easing formulas, 80ms stagger, bloom radii, adelay alignment, curves/colorbalance grade,
+  ASS emphasis tags, 1.12x punch-in, chars-per-minute targets, thumbnail hard-gates) **plus a
+  10-item "deliberately skipped" list** (zoompan, persistent chromatic aberration, glitch,
+  luma flicker, rainbow captions, wall-to-wall overshoot…).
+- `knowledge/youtube-algorithm-2026.md`: **R15-R25** — 2026 mechanics updates (Test & Compare now
+  judges by watch-time-per-impression; auto-dubbing; Shorts/long-form decoupling; seed-impression
+  day-0 playbook; satisfaction signals; tight-cluster browse matching; Communities posts;
+  AI-carousel defense; Ask Studio retro questions; the 30s-retention gate; Hype globalization).
+- `examples/03_premium_fx.py` — see the whole premium stack in ~3 seconds of output video,
+  zero real media: count-up (final frame asserted true), bloom, light sweep, sub-pixel
+  Ken Burns, grain/vignette, synthesized whoosh.
+
+### Changed
+- `README.md` / `README.en.md`: repo-structure table now lists `src/longform_maker/`.
+
 ## [0.6.0] — 2026-06-27
 
 **Pro audio chain + narration-speed timeline sync** (knowledge + technique; the biggest audio-quality jump in the kit so far). Motivated by "the editing sounds amateur" + "you talk too slow" feedback — the fix is the audio, not the picture.

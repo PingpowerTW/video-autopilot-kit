@@ -32,6 +32,7 @@ your answers fill it in — so it actually becomes **your** system.
 | Folder | What |
 |---|---|
 | ⭐ `src/capcut_helpers/` | **Primary editing path** — CapCut Desktop automation (draft I/O, 4-level mute, captions/effects, post-export ffmpeg, AI-subtitle fixes, b-roll ratio + sync audit). **Driven by an AI assistant + Computer Use operating the CapCut window** (see Requirements) |
+| `src/longform_maker/` | **Teaching long-form modules** — `fx_lib` premium-motion engine (sub-pixel Ken Burns / double bloom / light sweep / easing / synthesized SFX), `word_captions` word-timestamp captions (M105), `screen_clean` mechanized screen-recording cleanup (M104). Exact parameters → `knowledge/premium-motion-fx.md` |
 | `src/silent_vlog_maker/` | **Secondary path (not the default)** — pure ffmpeg pipeline, **only for silent (no-voiceover) vlogs + post-processing CapCut exports** (content audit, asset normalize, KenBurns, subtitle burn). For normal edits, use CapCut |
 | `knowledge/` | **Video-production knowledge base** — M1-M103 pitfall compendium + algorithm + SOP + editing craft |
 | ▶️ `examples/` | **Self-contained runnable demos** — ffmpeg-synthesized media; see the pipeline work in 60s (no CapCut/real footage) |

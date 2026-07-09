@@ -9,6 +9,11 @@
 還有：
   - still_blurfill()  M92 非滿版圖 → 模糊背景填滿 + 靜止（零抖動）
   - detect_long_pauses() / trim_dead_air_ranges() / remap_time()  M95 死空檔三軌同步剪
+v0.7.0 新 gates：
+  - check_caption_sync()       M105 — whisper 抽驗「字幕時間 = 真實語音」
+  - render_fullframe_sheets()  M104 — 全片 dense 全幀掃描圖（找中央浮窗/錄影軟體 UI）
+  - check_scene_pacing()       留存 gate — cut 密度分段上限（開頭最嚴）
+  - check_dead_air()           留存 gate — 畫面凍結 ∩ 音訊靜音 = 真死空檔（M95 機械化）
 """
 import subprocess, re, os
 
@@ -245,10 +250,216 @@ def check_captions_within_dur(ass_path, video_dur, slack=0.1):
             'note': f'末字幕 {round(last,2)}s vs 片長 {round(video_dur,2)}s (要 <=+{slack})'}
 
 
+# ---------------------------------------------------------------- 🎬 留存機械 gate
+# 兩條可機械驗的留存規則：cut 密度上限（開頭密、後段可放寬）+ 死空檔（畫面凍結∩音訊靜音）。
+def _pick_limit(t, windows):
+    """時間 t 落在哪個 window（[start,end)，end=None=到片尾）→ 回該段 gap 上限秒數。"""
+    for a, b, lim in windows:
+        if t >= a and (b is None or t < b):
+            return lim
+    return windows[-1][2]
+
+def _pacing_violations(points, windows):
+    """相鄰視覺變化點 → 超過該段上限的 gap 清單（用區間中點判落在哪段）。純函數可測。"""
+    out = []
+    for a, b in zip(points, points[1:]):
+        gap = b - a
+        lim = _pick_limit((a + b) / 2.0, windows)
+        if gap > lim:
+            out.append({'start': round(a, 2), 'end': round(b, 2),
+                        'gap': round(gap, 2), 'limit': lim})
+    return out
+
+def check_scene_pacing(video, windows=((0, 30, 7.0), (30, 180, 15.0), (180, None, 30.0)),
+                       scene_th=0.2):
+    """留存 gate：視覺變化(cut/鏡頭切換)間距不得超過分段上限（前 30s 最嚴 7s、
+    30-180s 15s、之後 30s）。scene detect 用 ffprobe lavfi movie+select。
+    回 {ok, violations, n_cuts, note}；ffprobe 不存在/失敗 → ok=None（skip 不擋）。"""
+    try:
+        dur = _probe_dur(video)
+        # lavfi 路徑跳脫（Windows）：'\' → '/'、':' → '\\:'（graph 層 + movie 層各吃一層）
+        esc = str(video).replace('\\', '/').replace(':', '\\\\:')
+        r = _run(['ffprobe', '-v', 'error', '-f', 'lavfi',
+                  f'movie={esc},select=gt(scene\\,{scene_th})',
+                  '-show_entries', 'frame=pts_time', '-of', 'csv=p=0'])
+    except Exception as e:
+        return {'ok': None, 'violations': [], 'n_cuts': 0,
+                'note': f'ffprobe unavailable ({e}) -> scene pacing skipped'}
+    if r.returncode != 0:
+        return {'ok': None, 'violations': [], 'n_cuts': 0,
+                'note': 'ffprobe scene detect failed -> skipped; stderr=' + (r.stderr or '')[-200:]}
+    pts = []
+    for ln in (r.stdout or '').splitlines():
+        ln = ln.strip().strip(',')
+        if not ln:
+            continue
+        try:
+            pts.append(float(ln))
+        except ValueError:
+            pass
+    points = sorted(set([0.0] + pts + [dur]))
+    violations = _pacing_violations(points, windows)
+    ok = not violations
+    return {'ok': ok, 'violations': violations, 'n_cuts': len(pts),
+            'note': f'{len(pts)} cuts; ' + ('pacing ok' if ok
+                    else f'{len(violations)} gap(s) over window limit')}
+
+def _parse_freeze_silence(stderr_text, end=None):
+    """ffmpeg stderr → (freezes, silences) 兩組 [(start,end)]。start/end 依序配對。
+    end 給了 → 未閉合的 start 封在 end（freezedetect 凍到片尾【不會】吐 freeze_end，
+    片尾凍住+靜音正是最典型死空檔）；end=None → 丟棄。純函數可測。"""
+    def _pairs(prefix):
+        out, cur = [], None
+        for m in re.finditer(prefix + r'_(start|end): ([\d.eE+-]+)', stderr_text):
+            kind, val = m.group(1), float(m.group(2))
+            if kind == 'start':
+                cur = val
+            elif kind == 'end' and cur is not None:
+                out.append((cur, val)); cur = None
+        if cur is not None and end is not None and end > cur:
+            out.append((cur, float(end)))
+        return out
+    return _pairs('freeze'), _pairs('silence')
+
+def _intersect_ranges(a, b):
+    """兩組區間的交集區間清單。純函數可測。"""
+    out = []
+    for s1, e1 in a:
+        for s2, e2 in b:
+            lo, hi = max(s1, s2), min(e1, e2)
+            if hi > lo:
+                out.append((lo, hi))
+    return sorted(out)
+
+def check_dead_air(video, freeze_db=-60, freeze_d=3.0, sil_db=-35, sil_d=2.0, max_total=0.5):
+    """留存 gate（M95 機械化）：畫面凍結(freezedetect) ∩ 音訊靜音(silencedetect)
+    = 真死空檔。交集總長 > max_total(0.5s) → ok=False 並列出區間。失敗 → ok=None。"""
+    try:
+        dur = _probe_dur(video)
+        r = _run(['ffmpeg', '-hide_banner', '-i', video,
+                  '-vf', f'freezedetect=n={freeze_db}dB:d={freeze_d}',
+                  '-af', f'silencedetect=noise={sil_db}dB:d={sil_d}',
+                  '-f', 'null', '-'])
+    except Exception as e:
+        return {'ok': None, 'dead_air': [], 'total': 0.0,
+                'note': f'ffmpeg unavailable ({e}) -> dead-air skipped'}
+    if r.returncode != 0:
+        return {'ok': None, 'dead_air': [], 'total': 0.0,
+                'note': 'ffmpeg failed -> skipped; stderr=' + (r.stderr or '')[-200:]}
+    freezes, silences = _parse_freeze_silence(r.stderr or '', end=dur)
+    inter = _intersect_ranges(freezes, silences)
+    total = sum(e - s for s, e in inter)
+    ok = total <= max_total
+    return {'ok': ok, 'dead_air': [(round(s, 2), round(e, 2)) for s, e in inter],
+            'total': round(total, 2), 'n_freeze': len(freezes), 'n_silence': len(silences),
+            'note': f'freeze&silence overlap {round(total, 2)}s '
+                    + ('(<= ' + str(max_total) + 's ok)' if ok else f'> {max_total}s = dead air')}
+
+# ---------------------------------------------------------------- M105 字幕同步 gate
+def _parse_ass_events(ass_path):
+    """ASS Dialogue 行 → [(start_s, end_s, text)]（去掉 {...} override tags）。"""
+    import re as _re
+    evs = []
+    def _sec(t):
+        h, m, s = t.split(':'); return int(h) * 3600 + int(m) * 60 + float(s)
+    with open(ass_path, encoding='utf-8') as fh:
+        for line in fh:
+            if not line.startswith('Dialogue:'):
+                continue
+            p = line.split(',', 9)
+            if len(p) < 10:
+                continue
+            evs.append((_sec(p[1]), _sec(p[2]), _re.sub(r'\{[^}]*\}', '', p[9]).strip()))
+    return evs
+
+
+def _char_overlap(a, b):
+    """CJK+英數字符集合重疊率（相對 b=字幕字符）。0-1。"""
+    import re as _re
+    ta = set(_re.findall(r'[一-鿿A-Za-z0-9]', a))
+    tb = set(_re.findall(r'[一-鿿A-Za-z0-9]', b))
+    if not tb:
+        return 1.0
+    return len(ta & tb) / len(tb)
+
+
+def check_caption_sync(video, ass_path, n=8, model_size='base', min_overlap=0.50, pad=0.25):
+    """M105 gate — 抽 n 行字幕，各抽該時間窗音訊 → whisper 轉錄 → 字符重疊率驗「字幕時間=真實語音」。
+    回 {ok, checked, fails:[{start,caption,heard,overlap}], note}。
+    faster_whisper 不可用 → ok=None（視為需人工驗，不默默放行）。"""
+    try:
+        from faster_whisper import WhisperModel
+    except Exception:
+        return {'ok': None, 'checked': 0, 'fails': [],
+                'note': 'faster_whisper unavailable -> caption sync needs manual check'}
+    import tempfile
+    evs = _parse_ass_events(ass_path)
+    if not evs:
+        return {'ok': False, 'checked': 0, 'fails': [], 'note': 'ASS has no events'}
+    idx = sorted(set(int(i * (len(evs) - 1) / max(1, n - 1)) for i in range(n)))
+    m = WhisperModel(model_size, device='cpu', compute_type='int8')
+    fails, results = [], []
+    with tempfile.TemporaryDirectory(prefix='capsync_') as td:
+        for i in idx:
+            s, e, txt = evs[i]
+            wav = os.path.join(td, f'w{i}.wav')
+            _run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{max(0, s - pad):.2f}',
+                  '-t', f'{(e - s) + 2 * pad:.2f}', '-i', str(video),
+                  '-vn', '-ar', '16000', '-ac', '1', wav])
+            segs, _info = m.transcribe(wav, language='zh', vad_filter=False)
+            heard = ''.join(sg.text.strip() for sg in segs)
+            ov = _char_overlap(heard, txt)
+            results.append((round(s, 2), txt, heard, round(ov, 2)))
+            if ov < min_overlap:
+                fails.append({'start': round(s, 2), 'caption': txt, 'heard': heard, 'overlap': round(ov, 2)})
+    ok = not fails
+    return {'ok': ok, 'checked': len(idx), 'fails': fails, 'results': results,
+            'note': f'{len(idx)} lines sampled; ' + ('all passed' if ok
+                    else f'{len(fails)} line(s) overlap < {min_overlap}')}
+
+
+def render_fullframe_sheets(video, out_dir, step=1.5, cell_w=300, cell_h=169, cols=7, rows=5):
+    """M104 gate 素材 — 全片每 step 秒抽【全幀】拼 contact sheets（不是只邊緣）。
+    回 sheet 路徑 list。產出後必須逐張人工看：找中央浮窗(錄影軟體面板/通知)+邊緣 chrome
+    —— 生成是機械的，看是必須的。"""
+    os.makedirs(out_dir, exist_ok=True)
+    dur = _probe_dur(video)
+    ts = [round(i * step, 2) for i in range(int(dur / step) + 1)]
+    per = cols * rows
+    sheets = []
+    for ci in range(0, len(ts), per):
+        chunk = ts[ci:ci + per]
+        frames = []
+        for t in chunk:
+            f = os.path.join(out_dir, f'ff_{t:07.2f}.jpg')
+            _run(['ffmpeg', '-v', 'error', '-y', '-ss', str(t), '-i', str(video),
+                  '-update', '1', '-frames:v', '1', '-vf', f'scale={cell_w}:{cell_h}', f])
+            frames.append(f)
+        ins = []
+        for f in frames:
+            ins += ['-i', f]
+        lbl = ''.join(f'[{i}:v]' for i in range(len(frames)))
+        r = max(1, (len(frames) + cols - 1) // cols)
+        sheet = os.path.join(out_dir, f'fullframe_sheet_{ci // per}.jpg')
+        _run(['ffmpeg', '-v', 'error', '-y'] + ins +
+             ['-filter_complex', f'{lbl}concat=n={len(frames)}:v=1:a=0,tile={cols}x{r}',
+              '-update', '1', '-frames:v', '1', sheet])
+        sheets.append(sheet)
+        for f in frames:
+            try: os.remove(f)
+            except OSError: pass
+    return sheets
+
+
 # ---------------------------------------------------------------- 🚦 QA 主入口
-def final_delivery_qa(video, voice=None, contact_out=None, audio=False, ass=None):
-    """🚦 交付前 QA（canon M91-M95 + M103 音訊 gate + QA 清單）。回 dict + 印報告。
-    機械項：M93 頻閃、M95 死空檔、M103(audio=True)LUFS/尾靜音/A-V同步/字幕溢出。人工項：看接觸表確認 M91/M92/M94/M68。"""
+def final_delivery_qa(video, voice=None, contact_out=None, audio=False, ass=None,
+                      caption_sync=False, sheets_dir=None, scene_pacing=False, dead_air=False):
+    """🚦 交付前 QA（canon M91-M95/M103-M105 + QA 清單）。回 dict + 印報告。
+    機械項：M93 頻閃、M95 死空檔、M103(audio=True)LUFS/尾靜音/A-V同步/字幕溢出、
+    M105 字幕同步(caption_sync=True)。
+    M104：sheets_dir 給了就強制產全幀掃描圖（人工逐張看 = 交付前提）。
+    留存 gate：scene_pacing=True 驗 cut 密度分段上限、dead_air=True 驗
+    畫面凍結∩靜音交集（兩者 ok=None=工具缺→只 warn 不擋；預設 False=舊行為不變）。"""
     rep = {'video': str(video), 'duration': round(_probe_dur(video), 2)}
     flashes = detect_flash(video)
     rep['flash_segments'] = flashes
@@ -268,9 +479,17 @@ def final_delivery_qa(video, voice=None, contact_out=None, audio=False, ass=None
         rep['audio_ok'] = rep['loudness']['ok'] and rep['tail_silence']['ok'] and rep['av_sync']['ok']
     if ass:
         rep['captions'] = check_captions_within_dur(ass, rep['duration'])
+        if caption_sync:   # M105：whisper 抽驗字幕時間=真實語音
+            rep['caption_sync'] = check_caption_sync(video, ass)
+    if scene_pacing:   # 留存 gate：cut 密度分段上限
+        rep['scene_pacing'] = check_scene_pacing(video)
+    if dead_air:       # 留存 gate：畫面凍結∩靜音 = 真死空檔（M95 機械化）
+        rep['dead_air'] = check_dead_air(video)
     if contact_out:
         contact_sheet(video, contact_out)
         rep['contact_sheet'] = str(contact_out)
+    if sheets_dir:   # M104：全幀 dense 掃描圖（生成機械、閱讀必須）
+        rep['fullframe_sheets'] = render_fullframe_sheets(video, sheets_dir)
 
     # cp950 console 不能印 emoji → runtime 輸出一律 ASCII marker（canon 文件才用 emoji）
     def _mk(ok): return '[OK] ' if ok else '[WARN] '
@@ -285,14 +504,30 @@ def final_delivery_qa(video, voice=None, contact_out=None, audio=False, ass=None
         print('  M103 av-sync :', _mk(rep['av_sync']['ok']) + rep['av_sync']['note'])
     if ass:
         print('  M103 caption :', _mk(rep['captions']['ok']) + rep['captions']['note'])
+        if caption_sync:
+            cs = rep['caption_sync']
+            print('  M105 cap-sync:', ('[??] ' if cs['ok'] is None else _mk(cs['ok'])) + cs['note'])
+    if scene_pacing:
+        sr = rep['scene_pacing']
+        print('  pacing    :', ('[??] ' if sr['ok'] is None else _mk(sr['ok'])) + sr['note'])
+    if dead_air:
+        dr = rep['dead_air']
+        print('  deadair   :', ('[??] ' if dr['ok'] is None else _mk(dr['ok'])) + dr['note'])
     if contact_out:
         print('  contact_sheet ->', contact_out)
+    if sheets_dir:
+        print(f"  M104 fullframe sheets x{len(rep['fullframe_sheets'])} -> {sheets_dir}  (必須逐張人工看：中央浮窗/錄影軟體面板)")
+    # 總閘門：機械可驗項全綠才算可交付（人工項仍需看接觸表；留存 gate ok=None=工具缺不擋）
+    _cs_bad = caption_sync and ass and rep.get('caption_sync', {}).get('ok') is False
+    _sp_bad = scene_pacing and rep.get('scene_pacing', {}).get('ok') is False
+    _da_bad = dead_air and rep.get('dead_air', {}).get('ok') is False
     rep['deliver_ok'] = not (rep['flash_flag'] or rep['border_flag']
                              or rep.get('deadair_flag', False)
                              or (audio and not rep['audio_ok'])
-                             or (ass and not rep['captions']['ok']))
+                             or (ass and not rep['captions']['ok'])
+                             or _cs_bad or _sp_bad or _da_bad)
     print('  [GATE]', 'DELIVER OK (機械項全綠)' if rep['deliver_ok'] else 'BLOCKED — 修正上面 [WARN] 再交付')
-    print('  Note: 人工逐格看接觸表 — M91 chrome/隱私 / M92 圖片排版 / M94 真實 artifact / M68 字幕(逗號/停頓/對位)')
+    print('  Note: 人工項 — M91/M104 全幀掃描圖逐張看(中央浮窗+邊緣chrome) / M92 圖片排版 / M94 真實 artifact / M68 字幕樣式')
     return rep
 
 

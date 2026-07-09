@@ -36,3 +36,5 @@
 
 ## ✍️ 腳本
 - [script-style-framework.md](script-style-framework.md) — 學「自己腳本風格」的框架（你填自己的 profile，不是套別人的聲音）
+
+- `premium-motion-fx.md` — premium motion design: exact easing/bloom/SFX/grade parameters + the deliberately-skipped list (wave 1-3 upgrade plan).
