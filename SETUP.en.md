@@ -12,7 +12,16 @@
 
 The kit has **two first-class paths** with different requirements:
 
-- **Path 1 — Programmatic (recommended default for adopters; Win / Mac / Linux)**: just Python 3.9+ and `ffmpeg`/`ffprobe`. **No CapCut, no Computer Use.** System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`.
+- **Path 1 — Programmatic (recommended default for adopters; Win / Mac / Linux)**: just Python 3.9+ and `ffmpeg`/`ffprobe`.
+
+  **Installing ffmpeg (one-time, all platforms):**
+  | Platform | Command |
+  |---|---|
+  | macOS | `brew install ffmpeg` (needs [Homebrew](https://brew.sh); verify with `ffmpeg -version`) |
+  | Windows | `winget install ffmpeg`, or grab a full build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) and add it to PATH |
+  | Linux | `sudo apt install ffmpeg` (Debian/Ubuntu) |
+
+  > Common misconception: "Mac doesn't have ffmpeg" — ffmpeg is cross-platform by design, and the Mac install is actually the easiest (one brew line). "Alternatives" like MoviePy / editly call ffmpeg under the hood anyway. **No CapCut, no Computer Use.** System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`.
 - **Path 2 — CapCut-assisted (what the author personally uses; Windows-first)**: additionally needs CapCut Desktop (international edition) + your AI assistant's Computer Use. **Version-sensitive** — read the compatibility matrix in [TROUBLESHOOTING](TROUBLESHOOTING.md) before touching draft JSON.
 - **On Mac** → go straight to Path 1 (there is no working equivalent of the CapCut GUI automation on Mac).
 

@@ -11,7 +11,16 @@
 
 這個 kit 有**兩條 first-class path**，需求不同：
 
-- **Path 1 — Programmatic（推薦採用者預設；Win / Mac / Linux）**：只要 Python 3.9+ 和 `ffmpeg`/`ffprobe`。**不需要 CapCut、不需要 Computer Use**。Mac/Linux 的系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測。
+- **Path 1 — Programmatic（推薦採用者預設；Win / Mac / Linux）**：只要 Python 3.9+ 和 `ffmpeg`/`ffprobe`。
+
+  **安裝 ffmpeg（一次搞定，三平台都有）**：
+  | 平台 | 指令 |
+  |---|---|
+  | macOS | `brew install ffmpeg`（需 [Homebrew](https://brew.sh)；裝完 `ffmpeg -version` 驗證）|
+  | Windows | `winget install ffmpeg` 或到 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 下載 full build 加入 PATH |
+  | Linux | `sudo apt install ffmpeg`（Debian/Ubuntu）|
+
+  > 常見誤會：「Mac 沒有 ffmpeg」——ffmpeg 本來就是跨平台的，Mac 裝起來反而最簡單（一行 brew）。MoviePy / editly 這類「替代方案」底層其實還是在呼叫 ffmpeg。**不需要 CapCut、不需要 Computer Use**。Mac/Linux 的系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測。
 - **Path 2 — CapCut-assisted（作者本人主用；Windows-first）**：額外需要 CapCut Desktop 國際版 + AI 助手的 Computer Use。**版本敏感** —— 動草稿 JSON 前先讀 [TROUBLESHOOTING](TROUBLESHOOTING.md) 的版本相容矩陣。
 - **Mac 用戶** → 直接走 Path 1（CapCut 的 GUI 自動化在 Mac 上沒有可用的等效機制）。
 
