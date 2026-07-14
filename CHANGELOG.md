@@ -3,6 +3,131 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.0] — 2026-07-10
+
+**Two-path repositioning + cross-platform support.** Driven by adopter feedback: CapCut
+version/encryption issues breaking draft automation, Mac users who couldn't run the
+"primary" path at all, and a clear preference among adopters for the fully programmatic
+pipeline. The kit now presents **two first-class paths** instead of "CapCut primary /
+ffmpeg secondary".
+
+### Added
+- **`src/platform_compat.py`** — standalone Win / Mac / Linux compatibility layer
+  (nothing in the kit imports *from* it circularly; `constants` / `paths` import it).
+  CJK-font probing with per-platform candidate lists (Windows order preserved so
+  resolution is identical to the old hardcodes; handles the macOS 15 Sequoia
+  `PingFang.ttc` disappearance), CapCut/Jianying drafts-dir resolution per platform
+  (`CAPCUT_USER_DATA` env override), returns `None` instead of raising so callers keep
+  their own fallbacks.
+- **`detect_draft_format()`** (`capcut_helpers`) — run before any draft-JSON edit:
+  detects plaintext vs. AES-encrypted drafts (Jianying CN 6.0+), reports a version hint
+  and whether the draft is directly editable, and accepts a project name / draft folder /
+  JSON file path. `load_draft()` now raises a guided error on encrypted drafts.
+- `TROUBLESHOOTING.md` — new **"CapCut version compatibility & Mac"** section: the
+  per-version draft-format matrix (international 6.x-9.x plaintext, Jianying CN ≤5.9
+  plaintext / 6.0+ encrypted with no official bypass), the three escape routes, Mac
+  draft paths + the `draft_info.json` filename difference, Mac automation limits
+  (no AppleScript dictionary → use the programmatic path), and a top-5 workflow-trap FAQ.
+
+### Changed
+- **`README.md` / `README.en.md` — two-path repositioning.** **Path 1 = Programmatic**
+  (`longform_maker` + `silent_vlog_maker` + the `capcut_helpers` QA gates) is
+  cross-platform (Win/Mac/Linux), CapCut-free, and the **recommended default for
+  adopters**; **Path 2 = CapCut-assisted** (draft JSON + Computer Use) is Windows-first
+  and version-sensitive — it's what the author personally uses, stated honestly as such.
+  Added a "Which path should I use?" decision tree up top and a per-module platform
+  support matrix.
+- `SETUP.md` / `SETUP.en.md` — platform requirements aligned with the two-path model;
+  the production section now asks which path you're on instead of assuming CapCut.
+
+## [0.7.0] — 2026-07-09
+
+**Premium motion engine + mechanized caption timing & screen-recording cleanup** (the biggest *visual*-quality jump in the kit so far — v0.6.0 fixed the sound, this one fixes the picture). Motivated by two shipped-video incidents (a recorder panel leaking into a delivered cut; captions drifting 2-3s from narration) plus a 6-lens research pass on what separates "clean" from "premium" motion design.
+
+### Added
+- `src/longform_maker/` — new module family for teaching long-form:
+  - **`fx_lib.py`** — the premium-motion engine: easing library (`ease_out_expo`, `ease_out_quint`,
+    `ease_out_back`, `smootherstep`…), stagger scheduler, per-frame film grain + vignette
+    (`texture_pass`), **sub-pixel float Ken Burns** (`ken_burns_frame`, the anti-`zoompan` —
+    integer-jitter-free push/pull on stills), **double-layer additive bloom** (tight 4px @60% +
+    wide 16px @30%), 45° **light sweep**, and a fully **synthesized SFX kit**
+    (whoosh / pop / tick / riser / hit — no audio assets needed). Real self-test.
+  - **`word_captions.py`** (M105) — caption timing from **whisper word-timestamps**: auto line-break
+    at real pauses (next-token onset), mishear fixes applied *before* line-breaking, dangler-aware
+    wrapping, master-timeline conversion (M103 speed-aware), ASS output — plus optional
+    **per-line single-keyword emphasis** (numbers-first, one hit per line, resets to white).
+  - **`screen_clean.py`** (M104) — screen recordings are default-toxic: enforced **head ≥1s + tail
+    trim** (recorder UI lives at *both* ends), chrome crop, blur-pad, mute, and **`blur_boxes`
+    targeted blurs** for center-of-frame UI text that cropping can't save. Real ffmpeg self-test.
+- `src/capcut_helpers/delivery_qa.py` — four new mechanical gates: **caption-sync spot-check**
+  (whisper re-transcribe n sampled lines, char-overlap ≥0.5), **full-frame contact sheets**
+  (dense ≤1.5s/frame scan — edge strips can't see center-frame floaters), **scene-pacing 3-band
+  audit** (max visual-change gaps 7s/15s/30s by video section), and **dead-air detection**
+  (freezedetect ∩ silencedetect; catches the classic "frozen tail + silence").
+- `knowledge/meta-lessons.md`: **M104** (screen-recording cleanup, mechanized), **M105**
+  (word-level caption timing, mechanized), **M106** (premium-motion wave-1: no static cards >5s,
+  sub-pixel-only camera moves, counter triple — expo + fixed digit slots + landing pop with the
+  **final frame asserted equal to the true value**, double bloom, SFX aligned to cuts ±50ms,
+  split-tone finishing).
+- `knowledge/premium-motion-fx.md` — the full wave-1/2/3 upgrade plan with exact parameters
+  (easing formulas, 80ms stagger, bloom radii, adelay alignment, curves/colorbalance grade,
+  ASS emphasis tags, 1.12x punch-in, chars-per-minute targets, thumbnail hard-gates) **plus a
+  10-item "deliberately skipped" list** (zoompan, persistent chromatic aberration, glitch,
+  luma flicker, rainbow captions, wall-to-wall overshoot…).
+- `knowledge/youtube-algorithm-2026.md`: **R15-R25** — 2026 mechanics updates (Test & Compare now
+  judges by watch-time-per-impression; auto-dubbing; Shorts/long-form decoupling; seed-impression
+  day-0 playbook; satisfaction signals; tight-cluster browse matching; Communities posts;
+  AI-carousel defense; Ask Studio retro questions; the 30s-retention gate; Hype globalization).
+- `examples/03_premium_fx.py` — see the whole premium stack in ~3 seconds of output video,
+  zero real media: count-up (final frame asserted true), bloom, light sweep, sub-pixel
+  Ken Burns, grain/vignette, synthesized whoosh.
+
+### Changed
+- `README.md` / `README.en.md`: repo-structure table now lists `src/longform_maker/`.
+
+## [0.6.0] — 2026-06-27
+
+**Pro audio chain + narration-speed timeline sync** (knowledge + technique; the biggest audio-quality jump in the kit so far). Motivated by "the editing sounds amateur" + "you talk too slow" feedback — the fix is the audio, not the picture.
+
+### Added
+- `knowledge/meta-lessons.md`: **M103** — making teaching long-form narration sound *pro*:
+  **acompressor** to flatten loud/soft swings (a real compressor, not a normalizer — the #1 amateur
+  tell), **sidechain-ducked BGM** (voice as the key → music auto-ducks when you speak, floats back in
+  the gaps; replaces a static `volume=` duck), **two-pass loudnorm** (`print_format=json` measure →
+  `measured_*`+`linear=true` apply, for accurate −14 LUFS without pumping), and a continuous pink
+  **room-tone bed** so the gaps aren't dead digital silence. Plus the **atempo speed-sync rule**: a
+  single `speed` constant must flow through audio/visual/captions (write it to `offsets['_speed']`,
+  consume as `/SP` downstream) or the timeline desyncs; and **tail-length alignment** (fade BGM/mix to
+  the *actual video length*, not audio length, so `-shortest` doesn't hard-cut the BGM at ~−23 dB =
+  outro click). Closes with **automated delivery gates** (M97): assert LUFS −14±1 / tail RMS<−40 dB /
+  audio-vs-video stream |Δ|<0.4 s / last-caption-end ≤ duration — and extracting the chain into a
+  reusable, ffmpeg-self-tested helper instead of copy-pasting it into every build script.
+- `knowledge/programmatic-video-build.md`: §7 now shows the **pro mix** (voice acompressor +
+  sidechain duck + two-pass loudnorm + tail-align) alongside the basic mix; §8 QA adds the
+  `audio=True` / `ass=` gate call.
+
+## [0.5.1] — 2026-06-25
+
+**Two new field-lessons from a teaching long-form rebuild** (knowledge-only; no code change).
+
+### Added
+- `knowledge/meta-lessons.md`: **M101** — cleaning self-recorded screen footage used as b-roll.
+  The reliable fix is to **re-record with the target app maximized** (covering the browser / AI
+  panels / IDE beside it) and crop only the OS taskbar — not to post-crop, which clips panels and
+  leaves blur bars (and the app's own UI isn't PII, so don't over-crop). Plus: the clean window can
+  be in the **middle** (recorder/notification UI is often at *both* ends → dense per-second scan,
+  bound extraction to the clean core); a "short" played inside a full browser page needs cropping to
+  the **player rectangle** (bookmark bar + others'-videos sidebar leak otherwise); and a **low-res
+  contact sheet hides chrome** — check each main-footage window at full resolution.
+- `knowledge/meta-lessons.md`: **M102** — on Windows, when a build script's stdout is redirected to a
+  file/pipe it defaults to **cp950**, so a `print()` containing `≤` / `✓` / emoji throws
+  `UnicodeEncodeError` and kills the whole build — and only in background/scheduled runs, never
+  interactively. Reconfigure stdout/stderr to UTF-8 at the top of every build script + pass
+  `PYTHONIOENCODING=utf-8` to subprocesses; test once in redirect mode before shipping.
+- `knowledge/programmatic-video-build.md`: §0 now carries the M101 screen-capture workflow and an
+  M102 build-environment note.
+- `M1-M100` → `M1-M102` across the docs (also fixed a couple of stale `M1-M99` references).
+
 ## [0.5.0] — 2026-06-23
 
 **Getting started: runnable examples.** A new `examples/` folder with self-contained,
